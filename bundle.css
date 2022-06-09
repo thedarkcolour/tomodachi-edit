@@ -1,0 +1,30 @@
+main.svelte-1hoym3u {
+  text-align: center;
+  padding: 1em;
+  max-width: 240px;
+  margin: 0 auto;
+}
+
+h1.svelte-1hoym3u {
+  color: #ff3e00;
+  text-transform: uppercase;
+  font-size: 4em;
+  font-weight: 100;
+}
+
+@media (min-width: 640px) {
+  main.svelte-1hoym3u {
+    max-width: none;
+  }
+}
+div.svelte-z02mi4 {
+  column-gap: 20px;
+}
+
+input.svelte-z02mi4 {
+  max-width: 800px;
+}
+
+button.svelte-z02mi4 {
+  border-width: 2px;
+}
