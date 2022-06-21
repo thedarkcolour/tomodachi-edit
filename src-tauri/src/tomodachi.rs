@@ -38,7 +38,12 @@ const FRIENDS_SIZE: usize = 0x100;
 const FOODS_INVENTORY_LOC: usize = 0x17F0;
 
 lazy_static::lazy_static! {
-    pub(crate) static ref FOOD_REGISTRY: Vec<&'static str> = include_str!("foods.txt").lines().collect();
+    pub(crate) static ref FOOD_REGISTRY: Vec<Food> = {
+        let foods_txt = include_str!("foods.json");
+        let foods: Vec<Food> = serde_json::from_str(foods_txt).expect("Couldn't parse food registry. Report to GitHub!");
+
+        foods
+    };
 }
 
 fn read_u8(bytes: &[u8], start_index: usize) -> u8 {
@@ -86,8 +91,14 @@ fn read_string_hex(bytes: &[u8], start_index: usize, str_len: usize) -> String {
 }
 
 // Mii properties
-const COPYING_ENABLED_OFFSET: usize = 1;
-const NICKNAME_OFFSET: usize = 26;
+const COPYING_ENABLED_OFFSET: usize = 1; // 1 byte
+const NICKNAME_OFFSET: usize = 26; // 20 bytes
+const SHARING_OFFSET: usize = 48; // 1 byte
+const FIRST_NAME_OFFSET: usize = 96; // 30 bytes
+const LAST_NAME_OFFSET: usize = 128; // 30 bytes
+const NICKNAME_PRONUNCIATION_OFFSET: usize = 480; // 40 bytes
+const FIRST_NAME_PRONUNCIATION_OFFSET: usize = 546; // 60 bytes
+const LAST_NAME_PRONUNCIATION_OFFSET: usize = 612; // 60 bytes
 
 fn read_miis(save_data: &[u8]) -> [Mii; 100] {
     let mii_data = &save_data[MII_DATA_LOC .. MII_DATA_LOC + (100 * MII_DATA_SIZE)];
@@ -96,12 +107,12 @@ fn read_miis(save_data: &[u8]) -> [Mii; 100] {
     for (mii_index, mii_bytes) in mii_data.chunks_exact(MII_DATA_SIZE).enumerate() {
         let copying_enabled = !read_string_hex(mii_bytes, COPYING_ENABLED_OFFSET, 1).eq("00");
         let nickname = read_string_utf16(mii_bytes, NICKNAME_OFFSET, 10);
-        let sharing_enabled = read_string_hex(mii_bytes, 48, 1).eq("00");
-        let first_name = read_string_utf16(mii_bytes, 96, 15);
-        let last_name = read_string_utf16(mii_bytes, 26 + 102, 15);
-        let nickname_pronunciation = read_string_utf16(mii_bytes, 26 + 454, 20);
-        let first_name_pronunciation = read_string_utf16(mii_bytes, 26 + 520, 30);
-        let last_name_pronunciation = read_string_utf16(mii_bytes, 26 + 586, 30);
+        let sharing_enabled = read_string_hex(mii_bytes, SHARING_OFFSET, 1).eq("00");
+        let first_name = read_string_utf16(mii_bytes, FIRST_NAME_OFFSET, 15);
+        let last_name = read_string_utf16(mii_bytes, LAST_NAME_OFFSET, 15);
+        let nickname_pronunciation = read_string_utf16(mii_bytes, NICKNAME_PRONUNCIATION_OFFSET, 20);
+        let first_name_pronunciation = read_string_utf16(mii_bytes, FIRST_NAME_PRONUNCIATION_OFFSET, 30);
+        let last_name_pronunciation = read_string_utf16(mii_bytes, LAST_NAME_PRONUNCIATION_OFFSET, 30);
         let pampered_rating = read_u32(mii_bytes, 26 + 666);
         let economy_rating = read_u32(mii_bytes, 696);
         let emotions = read_u8(mii_bytes, 26 + 674);
@@ -111,9 +122,10 @@ fn read_miis(save_data: &[u8]) -> [Mii; 100] {
         let super_all_time_favorite = read_u16(mii_bytes, 1576);
         let worst = read_u16(mii_bytes, 1582);
 
-        println!("Mii {} ({}) occupies bytes {:X} to {:X}", mii_index, first_name, MII_DATA_LOC + (MII_DATA_SIZE * mii_index), MII_DATA_LOC + (MII_DATA_SIZE * (mii_index + 1)));
-
+        // only set non-empty miis
         if !nickname.trim().is_empty() && !nickname.starts_with("\0") {
+            println!("Mii {} ({}) occupies bytes {:X} to {:X}", mii_index, first_name, MII_DATA_LOC + (MII_DATA_SIZE * mii_index), MII_DATA_LOC + (MII_DATA_SIZE * (mii_index + 1)));
+
             let relationships = read_relationships(save_data, mii_index);
 
             miis[mii_index] = Mii {
@@ -156,17 +168,16 @@ fn read_relationships(save_data: &[u8], mii_index: usize) -> [Relationship; 100]
     }
 
     unsafe { std::mem::transmute::<_, [Relationship; 100]>(data) }
-    
 }
 
-fn read_food_items(save_data: &[u8], start_index: usize) -> [u8; 231] {
+fn read_food_inventory(save_data: &[u8], start_index: usize) -> [u8; 231] {
     let food_items = &save_data[start_index .. start_index + 231];
     
     for (i, count) in food_items.iter().enumerate() {
-        if *count == 253 {
-            println!("???x {}", FOOD_REGISTRY[i + 1]);
+        if *count == 253 { // 253 indicates an undiscovered food
+            println!("{:X} - ???x {}", i + start_index, FOOD_REGISTRY[i + 1].name);
         } else {
-            println!("{:3}x {}", count, FOOD_REGISTRY[i + 1]);
+            println!("{:X} - {:3}x {}", i + start_index, count, FOOD_REGISTRY[i + 1].name);
         }
     }
 
@@ -205,7 +216,7 @@ pub(crate) struct Island {
 }
 
 impl Island {
-    pub(crate) fn read(bytes: &[u8]) -> Island {
+    pub(crate) fn parse(bytes: &[u8]) -> Island {
         Island {
             name: read_string_utf16(&bytes, ISLAND_NAME_LOC, 10),
             name_pronunciation: read_string_utf16(&bytes, ISLAND_NAME_PRONUNCIATION, 20),
@@ -230,7 +241,7 @@ impl Island {
             travelers_leaderboard: read_u8(&bytes, TRAVELERS_LEADERBOARD_LOC),
             splurge_leaderboard: read_u8(&bytes, SPLURGE_LEADERBOARD_LOC),
             island_address: read_string_hex(&bytes, ISLAND_ADDRESS_LOC, 16),
-            food_items: read_food_items(&bytes, FOODS_INVENTORY_LOC),
+            food_items: read_food_inventory(&bytes, FOODS_INVENTORY_LOC),
             miis: read_miis(&bytes),
         }
     }
@@ -284,7 +295,13 @@ struct Relationship {
     relation: u8,
 }
 
-// Relation types
+#[derive(Deserialize, Serialize)]
+pub(crate) struct Food {
+    name: &'static str,
+    favorite_id: u16,
+}
+
+// Relationship types
 const UNKNOWN: u8 = 0;
 const FRIEND: u8 = 1;
 const LOVER: u8 = 2;
@@ -314,9 +331,3 @@ impl <T : Serialize, const N: usize> BigArray for [T; N] {
         serde::ser::SerializeTuple::end(seq)
     }
 }
-
-// #[derive(Serialize, Deserialize)]
-// enum FieldChanged {
-//     FirstName { newValue: String },
-//     FirstNamePronunciation { newValue: String },
-// }

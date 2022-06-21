@@ -1,10 +1,10 @@
 <script lang='ts'>
     import { invoke } from '@tauri-apps/api';
     import { listen } from '@tauri-apps/api/event';
-    import type { Island } from './main';
+    import type { Food, Island } from './main';
     import { islandData, foodRegistry } from './stores';
 
-    invoke('get_food_registry').then((payload: Array<String>) => {
+    invoke('get_food_registry').then((payload: Array<Food>) => {
         foodRegistry.set(payload);
     });
 
@@ -34,8 +34,8 @@
                 status.textContent = 'Could not read file at specified path (does the file exist?)';
                 status.classList.add('invalid-file');
             } else if (response == 0) {
-                status.textContent = 'Save file is valid'
-                status.classList.remove('invalid-file')
+                status.textContent = 'Save file is valid';
+                status.classList.remove('invalid-file');
 
                 invoke('load_island', { path: newValue }).then((island: Island) => {
                     islandData.set(island);
@@ -59,8 +59,8 @@
                     });
                     // manually fire the event because adding options to an empty select element doesn't fire the event
                     // even though the selected element has changed
-                    let event = new Event("change");
-                    miiSelector.dispatchEvent(event);
+                    document.getElementById('food-inventory-item').dispatchEvent(new Event("change"));
+                    miiSelector.dispatchEvent(new Event("change"));
                 });
             }
         });

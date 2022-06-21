@@ -1,29 +1,7 @@
 <script lang='ts'>
     import { invoke } from '@tauri-apps/api';
-	import { Island, foodId2RegistryIndex } from './main';
+	import { foodsByFavoriteId } from './main';
 	import { islandData, foodRegistry } from './stores';
-
-	document.addEventListener('DOMContentLoaded', (event) => {
-		invoke('get_food_registry').then((registry: Array<string>) => {
-			foodRegistry.set(registry);
-			console.log(registry);
-
-			const selectors = document.getElementsByClassName('food-selector');
-
-			console.log(selectors);
-			for (let i = 0; i < selectors.length; i++) {
-				const selector = selectors[i];
-
-				registry.forEach((food) => {
-					const option = document.createElement('option');
-
-					option.value = food;
-					option.innerHTML = food;
-					selector.append(option);
-				});
-			}
-		});
-	});
 
 	let miiTextFields = [
 		{label: 'First Name:', fieldId: 'first_name', maxLength: 15},
@@ -40,6 +18,20 @@
 		{label: 'Worst Ever: ', fieldId: 'worst_ever'},
 	]
 
+	export function onFoodsLoaded() {
+		const selectors = document.getElementsByClassName('food-selector');			
+			for (let i = 0; i < selectors.length; i++) {
+				const selector = selectors[i];
+
+				$foodRegistry.forEach((food) => {
+					const option = document.createElement('option');
+					option.value = food.name;
+					option.innerHTML = food.name;
+					selector.append(option);
+				});
+			}
+	}
+
 	function onMiiSelected() {
 		let selectedMiiElement = document.getElementById('selected-mii') as HTMLSelectElement;
 
@@ -54,7 +46,8 @@
 			miiFoodFields.forEach(field => {
 				const element = (document.getElementById(field.fieldId) as HTMLSelectElement);
 				element.disabled = false;
-				element.selectedIndex = foodId2RegistryIndex.get(selectedMii[field.fieldId]);
+				// inventory does not inclue "Nothing" but selectors do
+				element.selectedIndex = foodsByFavoriteId.get(selectedMii[field.fieldId]).inventory_id + 1;
 			});
 		}
 	}
@@ -111,9 +104,12 @@
 			{#each miiTextFields as {label, fieldId, maxLength}}
 				<label><span id='{fieldId}_span'>{label}</span><input maxlength="{maxLength}" id='{fieldId}' type='text' on:change='{onFieldChange(fieldId)}'></label>
 			{/each}
-			{#each miiFoodFields as {label, fieldId}}
-				<label><span id='{fieldId}_span'>{label}</span><select disabled=true class='food-selector' id='{fieldId}'></select></label>
-			{/each}
+			<details>
+				<summary>Favorite/Least Favorite Foods</summary>
+				{#each miiFoodFields as {label, fieldId}}
+					<label><span id='{fieldId}_span'>{label}</span><select disabled=true class='food-selector' id='{fieldId}'></select></label>
+				{/each}
+			</details>
 		</div>
 		<button id='save-button' disabled=true on:click="{saveMiiChanges}">Save Changes</button>
 	</div>

@@ -4,7 +4,6 @@
 )]
 
 use std::fs::File;
-use std::io::Read;
 use serde::Deserialize;
 use tauri::{Window, Wry};
 use tauri::api::dialog::FileDialogBuilder;
@@ -55,15 +54,13 @@ fn check_file_target(path: &str) -> u32 {
 
 #[tauri::command]
 fn load_island(path: &str) -> tomodachi::Island {
-    let mut f = File::open(path).expect(format!("Could not open file at path {}", path).as_str());
-    let mut save_data_u8 = vec![0_u8; 0];
-    f.read_to_end(&mut save_data_u8).expect("Failed to read file data");
+    let save_data_u8 = std::fs::read(path).expect(format!("Could not open/read file at path {}", path).as_str());
 
-    return tomodachi::Island::read(&save_data_u8);
+    return tomodachi::Island::parse(&save_data_u8);
 }
 
 #[tauri::command]
-fn get_food_registry() -> &'static Vec<&'static str> {
+fn get_food_registry() -> &'static Vec<tomodachi::Food> {
     return &*tomodachi::FOOD_REGISTRY;
 }
 
