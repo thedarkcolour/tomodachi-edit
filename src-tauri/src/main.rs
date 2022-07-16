@@ -8,13 +8,12 @@ use serde::Deserialize;
 use tauri::{Window, Wry};
 use tauri::api::dialog::FileDialogBuilder;
 use std::os::windows::fs::MetadataExt;
-use substring::Substring;
 
 mod tomodachi;
 
 fn main() {
     tauri::Builder::default()
-        .invoke_handler(tauri::generate_handler![open_file_chooser, check_file_target, load_island, get_food_registry])
+        .invoke_handler(tauri::generate_handler![open_file_chooser, check_file_target, load_island, get_food_registry, unlock_all_clothes])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
@@ -40,7 +39,7 @@ fn check_file_target(path: &str) -> u32 {
         Ok(f) => {
             return if f.metadata().unwrap().file_size() != (SAVE_DATA_SIZE as u64) {
                 1
-            } else if !path.substring(path.len() - 15, path.len()).eq("savedataArc.txt") {
+            } else if !path[path.len() - 15 .. path.len()].eq("savedataArc.txt") {
                 2
             } else {
                 0
@@ -73,6 +72,12 @@ fn save_mii_changes(save_file_path: &str, mii_index: usize, changes: Vec<&str>) 
             eprintln!("Invalid path is open?");
         }
     });
+}
+
+#[tauri::command]
+fn unlock_all_clothes(save_file_path: &str) -> bool {
+    tomodachi::unlock_all_clothes(save_file_path);
+    true
 }
 
 #[derive(Deserialize)]

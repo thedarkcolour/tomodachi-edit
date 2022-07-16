@@ -1,4 +1,4 @@
-use std::mem::MaybeUninit;
+use std::{mem::MaybeUninit, fs::OpenOptions, io::{BufWriter, Write, Seek, SeekFrom}};
 
 use serde::{Serialize, Serializer, Deserialize};
 
@@ -36,6 +36,9 @@ const MII_DATA_SIZE: usize = 0x660;
 const FRIENDS_LOC: usize = 0x299F0;
 const FRIENDS_SIZE: usize = 0x100;
 const FOODS_INVENTORY_LOC: usize = 0x17F0;
+const EVENT_FOUNTAIN: usize = 0x1E4AF8;
+const TIME_TRAVELLED: usize = 0x1E4C70; // bool
+const CLOTHES_INVENTORY_LOC: usize = 0x30; // from 0 to 3575
 
 lazy_static::lazy_static! {
     pub(crate) static ref FOOD_REGISTRY: Vec<Food> = {
@@ -99,6 +102,7 @@ const LAST_NAME_OFFSET: usize = 128; // 30 bytes
 const NICKNAME_PRONUNCIATION_OFFSET: usize = 480; // 40 bytes
 const FIRST_NAME_PRONUNCIATION_OFFSET: usize = 546; // 60 bytes
 const LAST_NAME_PRONUNCIATION_OFFSET: usize = 612; // 60 bytes
+const FOOD_FULLNESS_LOC: usize = 1571; // 1 byte, 0 ..= 100
 
 fn read_miis(save_data: &[u8]) -> [Mii; 100] {
     let mii_data = &save_data[MII_DATA_LOC .. MII_DATA_LOC + (100 * MII_DATA_SIZE)];
@@ -117,9 +121,11 @@ fn read_miis(save_data: &[u8]) -> [Mii; 100] {
         let economy_rating = read_u32(mii_bytes, 696);
         let emotions = read_u8(mii_bytes, 26 + 674);
         let relation_to_you = read_u8(mii_bytes, 26 + 675);
-        let all_time_favorite = read_u16(mii_bytes, 1580);
-        let worst_ever = read_u16(mii_bytes, 1578);
+        let stomach_contents = read_u16(mii_bytes, 1568);
+        let fullness = read_u8(mii_bytes, FOOD_FULLNESS_LOC);
         let super_all_time_favorite = read_u16(mii_bytes, 1576);
+        let worst_ever = read_u16(mii_bytes, 1578);
+        let all_time_favorite = read_u16(mii_bytes, 1580);
         let worst = read_u16(mii_bytes, 1582);
 
         // only set non-empty miis
@@ -146,6 +152,8 @@ fn read_miis(save_data: &[u8]) -> [Mii; 100] {
                 super_all_time_favorite,
                 worst,
                 worst_ever,
+                stomach_contents,
+                fullness,
             };
         }
     };
@@ -184,6 +192,20 @@ fn read_food_inventory(save_data: &[u8], start_index: usize) -> [u8; 231] {
     food_items.try_into().expect("Slice with incorrect length")
 }
 
+// writes to the save file. No backups yet, so make your own.
+pub(crate) fn unlock_all_clothes(save_data: &str) {
+    println!("Trying to write to file...");
+    let file = OpenOptions::new()
+        .write(true)
+        .open(save_data)
+        .expect("Unable to write to file");
+    let mut writer = BufWriter::new(file);
+
+    writer.seek(SeekFrom::Start(CLOTHES_INVENTORY_LOC.try_into().unwrap())).expect("Failed to seek forward in the file");
+    writer.write(&[0_u8; 3575]).expect("Failed to write to file");
+    println!("Wrote to file");
+}
+
 #[derive(Debug, Serialize, Clone)]
 pub(crate) struct Island {
     name: String,
@@ -216,7 +238,7 @@ pub(crate) struct Island {
 }
 
 impl Island {
-    pub(crate) fn parse(bytes: &[u8]) -> Island {
+    pub(crate) fn parse(bytes: &[u8]) -> Island {        
         Island {
             name: read_string_utf16(&bytes, ISLAND_NAME_LOC, 10),
             name_pronunciation: read_string_utf16(&bytes, ISLAND_NAME_PRONUNCIATION, 20),
@@ -267,6 +289,8 @@ struct Mii {
     worst_ever: u16,
     super_all_time_favorite: u16,
     worst: u16,
+    stomach_contents: u16,
+    fullness: u8,
 }
 
 const EMPTY_MII: Mii = Mii {
@@ -287,6 +311,8 @@ const EMPTY_MII: Mii = Mii {
     worst_ever: 0,
     super_all_time_favorite: 0,
     worst: 0,
+    stomach_contents: 0,
+    fullness: 0,
 };
 
 #[derive(Debug, Serialize, Clone, Copy)]

@@ -18,7 +18,7 @@
         invoke('open_file_chooser');
     }
 
-    function onFileChanged() {
+    export function onFileChanged() {
         let newValue: string = (document.getElementById('chosen-file') as HTMLInputElement).value;
 
         invoke('check_file_target', { path: newValue }).then((response: number) => {
@@ -37,32 +37,36 @@
                 status.textContent = 'Save file is valid';
                 status.classList.remove('invalid-file');
 
-                invoke('load_island', { path: newValue }).then((island: Island) => {
-                    islandData.set(island);
-                    console.log(island);
-                    // Thank you: https://stackoverflow.com/a/34897151/10860617
-                    (document.getElementById('island-name') as HTMLSpanElement).textContent = island.name.replace(/\0[\s\S]*$/g,'');
-                    (document.getElementById('money') as HTMLSpanElement).textContent = formatMoney(island.money);
-                    (document.getElementById('problems-solved') as HTMLSpanElement).textContent = island.problems_solved.toString();
-                    
-                    const miiSelector = (document.getElementById('selected-mii') as HTMLSelectElement);     
-                    miiSelector.textContent = '';
-                    island.miis.forEach((mii, i) => {
-                        if (mii.nickname != '' && !mii.nickname.startsWith('\0')) {
-                            const option = document.createElement('option');
-                            const optionLabel = `${i + 1}: ${mii.nickname}`;
-                            // todo check the difference between these two
-                            option.value = mii.nickname;
-                            option.innerHTML = optionLabel;
-                            miiSelector.appendChild(option);
-                        }
-                    });
-                    // manually fire the event because adding options to an empty select element doesn't fire the event
-                    // even though the selected element has changed
-                    document.getElementById('food-inventory-item').dispatchEvent(new Event("change"));
-                    miiSelector.dispatchEvent(new Event("change"));
-                });
+                loadIslandFromFile(newValue);
             }
+        });
+    }
+
+    function loadIslandFromFile(path: string) {
+        invoke('load_island', { path: path }).then((island: Island) => {
+            islandData.set(island);
+            console.log(island);
+            // Thank you: https://stackoverflow.com/a/34897151/10860617
+            (document.getElementById('island-name') as HTMLSpanElement).textContent = island.name.replace(/\0[\s\S]*$/g,'');
+            (document.getElementById('money') as HTMLSpanElement).textContent = formatMoney(island.money);
+            (document.getElementById('problems-solved') as HTMLSpanElement).textContent = island.problems_solved.toString();
+            
+            const miiSelector = (document.getElementById('selected-mii') as HTMLSelectElement);     
+            miiSelector.textContent = '';
+            island.miis.forEach((mii, i) => {
+                if (mii.nickname != '' && !mii.nickname.startsWith('\0')) {
+                    const option = document.createElement('option');
+                    const optionLabel = `${i + 1}: ${mii.nickname}`;
+                    // todo check the difference between these two
+                    option.value = mii.nickname;
+                    option.innerHTML = optionLabel;
+                    miiSelector.appendChild(option);
+                }
+            });
+            // manually fire the event because adding options to an empty select element doesn't fire the event
+            // even though the selected element has changed
+            document.getElementById('food-inventory-item').dispatchEvent(new Event("change"));
+            miiSelector.dispatchEvent(new Event("change"));
         });
     }
 

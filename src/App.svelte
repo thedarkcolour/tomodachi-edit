@@ -6,6 +6,7 @@
 	import { foodRegistry, islandData } from './stores';
 
 	let miiEdit: MiiEdit;
+	let saveFileManager: SaveFile;
 
 	document.addEventListener('DOMContentLoaded', (event) => {
 		invoke('get_food_registry').then((registry: Array<Food>) => {
@@ -31,7 +32,7 @@
 		});
 	});
 
-	export function onFoodSelected() {
+	function onFoodSelected() {
 		const index = (document.getElementById('food-inventory-item') as HTMLSelectElement).selectedIndex;
 		//const food = $foodRegistry[index];
 		const count = document.getElementById('food-inventory-amount') as HTMLInputElement;
@@ -52,10 +53,18 @@
 			}
 		}
 	}
+	function onUnlockAllClothes() {
+		console.log("Balls");
+        let newValue: string = (document.getElementById('chosen-file') as HTMLInputElement).value;
+
+		invoke('unlock_all_clothes', { saveFilePath: newValue }).then(blah => {
+			saveFileManager.onFileChanged();
+		});
+	}
 </script>
 
 <main>
-	<SaveFile/>
+	<SaveFile bind:this={saveFileManager}/>
 	<div id='island-info' class='info-section'>
 		<h1>Island Info</h1>
 		<p>Island Name: <span id='island-name'></span></p>
@@ -68,6 +77,10 @@
 			<input id='food-inventory-amount' type='number' min='0' max='99'>
 			<span>Discovered</span>
 			<input id='food-discovered' type='checkbox'>
+		</div>
+		
+		<div>
+			<button on:click="{onUnlockAllClothes}">Unlock all clothes</button>
 		</div>
 	</div>
 
